@@ -1,0 +1,183 @@
+{
+  "segments": [
+    {
+      "index": 0,
+      "source": "关于 2026 年春季学期选课的通知",
+      "masked": "关于 2026 年春季学期选课的 [[T1]]",
+      "translated": "объявление о выборе дисциплин на весенний семестр 2026 года",
+      "glossaryMatches": [
+        {
+          "origin": "通知",
+          "target": "объявление",
+          "domain": "admin"
+        }
+      ],
+      "protected": [],
+      "nameSuggestions": [],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    },
+    {
+      "index": 1,
+      "source": "各位同学：2026年春季学期选课将于 2026年5月12日 开始，请登录教务系统完成选课。",
+      "masked": "各位同学:2026年春季学期选课将于 [[T1]] 开始, 请登录教务系统完成选课.",
+      "translated": "Уважаемые студенты! Выбор дисциплин на весенний семестр 2026 года начнётся 2026年5月12日. Пожалуйста, войдите в учебную систему и завершите выбор.",
+      "glossaryMatches": [],
+      "protected": [
+        {
+          "rule": "date_zh",
+          "text": "2026年5月12日"
+        }
+      ],
+      "nameSuggestions": [],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    },
+    {
+      "index": 2,
+      "source": "本次开放的课程包括数据结构、操作系统、算法设计与分析、离散数学与概率论。",
+      "masked": "本次开放的课程包括 [[T1]], [[T2]], [[T3]], [[T4]] 与 [[T5]].",
+      "translated": "В этом семестре открыты следующие дисциплины: структуры данных, операционная система, алгоритмы и анализ алгоритмов, дискретная математика, теория вероятностей.",
+      "glossaryMatches": [
+        {
+          "origin": "数据结构",
+          "target": "структуры данных",
+          "domain": "cs"
+        },
+        {
+          "origin": "操作系统",
+          "target": "операционная система",
+          "domain": "cs"
+        },
+        {
+          "origin": "算法设计与分析",
+          "target": "алгоритмы и анализ алгоритмов",
+          "domain": "cs"
+        },
+        {
+          "origin": "离散数学",
+          "target": "дискретная математика",
+          "domain": "math"
+        },
+        {
+          "origin": "概率论",
+          "target": "теория вероятностей",
+          "domain": "math"
+        }
+      ],
+      "protected": [],
+      "nameSuggestions": [],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    },
+    {
+      "index": 3,
+      "source": "数据结构（课程号 МА101）与操作系统（课程号 МА102）为先修课程，教室为 3-412。",
+      "masked": "[[T1]](课程号 [[T3]])与 [[T2]](课程号 [[T4]])为先修课程, 教室为 [[T5]].",
+      "translated": "структуры данных (код курса МА101) и операционная система (код курса МА102) являются предшествующими дисциплинами, аудитория 3-412.",
+      "glossaryMatches": [
+        {
+          "origin": "数据结构",
+          "target": "структуры данных",
+          "domain": "cs"
+        },
+        {
+          "origin": "操作系统",
+          "target": "операционная система",
+          "domain": "cs"
+        }
+      ],
+      "protected": [
+        {
+          "rule": "course_code",
+          "text": "МА101"
+        },
+        {
+          "rule": "course_code",
+          "text": "МА102"
+        },
+        {
+          "rule": "room",
+          "text": "3-412"
+        }
+      ],
+      "nameSuggestions": [],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    },
+    {
+      "index": 4,
+      "source": "如有疑问请联系教务处 И.И. Иванов，邮箱 jwc@smbu.edu.cn，电话 +86 755 1234 5678。",
+      "masked": "如有疑问请联系 [[T1]] [[T4]] Иванов, 邮箱 [[T2]], 电话 [[T3]].",
+      "translated": "По вопросам обращайтесь в учебное управление, И.И. Иванов, эл. почта jwc@smbu.edu.cn, тел. +86 755 1234 5678.",
+      "glossaryMatches": [
+        {
+          "origin": "教务处",
+          "target": "учебное управление",
+          "domain": "admin"
+        }
+      ],
+      "protected": [
+        {
+          "rule": "email",
+          "text": "jwc@smbu.edu.cn"
+        },
+        {
+          "rule": "phone",
+          "text": "+86 755 1234 5678"
+        },
+        {
+          "rule": "initials",
+          "text": "И.И."
+        }
+      ],
+      "nameSuggestions": [
+        {
+          "source": "Иванов",
+          "han": "伊万诺夫",
+          "method": "dictionary",
+          "review": false
+        }
+      ],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    },
+    {
+      "index": 5,
+      "source": "未按期完成选课的同学，将影响本学期学分认定与奖学金评定。",
+      "masked": "未按期完成选课的同学, 将影响本学期 [[T1]] 认定与 [[T2]] 评定.",
+      "translated": "Студенты, не завершившие выбор дисциплин в срок, столкнутся с последствиями для учёта зачётная единица и назначения стипендия в этом семестре.",
+      "glossaryMatches": [
+        {
+          "origin": "学分",
+          "target": "зачётная единица",
+          "domain": "admin"
+        },
+        {
+          "origin": "奖学金",
+          "target": "стипендия",
+          "domain": "admin"
+        }
+      ],
+      "protected": [],
+      "nameSuggestions": [],
+      "placeholderRestoreRate": 1.0,
+      "warnings": []
+    }
+  ],
+  "glossary": {
+    "name": "campus_zh_ru",
+    "version": "0.1.0",
+    "count": 119,
+    "domains": {
+      "admin": 47,
+      "cs": 23,
+      "math": 16,
+      "campus": 12,
+      "econ": 11,
+      "physics": 10
+    },
+    "with_note": 118,
+    "with_source": 119
+  }
+}

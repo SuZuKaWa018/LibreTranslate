@@ -242,6 +242,21 @@ _default_options_objects = [
         'value_type': 'str'
     },
     {
+        'name': 'GLOSSARY_DIR',
+        'default_value': 'data/glossary',
+        'value_type': 'str'
+    },
+    {
+        'name': 'GLOSSARY',
+        'default_value': 'campus_zh_ru',
+        'value_type': 'str'
+    },
+    {
+        'name': 'CAMPUS',
+        'default_value': False,
+        'value_type': 'bool'
+    },
+    {
         'name': 'URL_PREFIX',
         'default_value': '',
         'value_type': 'str'

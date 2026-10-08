@@ -255,6 +255,26 @@ def get_parser():
         type=str,
         help="Add a prefix like /url-prefix to URL: example.com:5000/url-prefix/",
     )
+    parser.add_argument(
+        "--glossary-dir",
+        default=DEFARGS['GLOSSARY_DIR'],
+        type=str,
+        metavar="<path>",
+        help="Directory holding campus glossary JSON files (%(default)s)",
+    )
+    parser.add_argument(
+        "--glossary",
+        default=DEFARGS['GLOSSARY'],
+        type=str,
+        metavar="<profile>",
+        help="Default glossary profile name, e.g. campus_zh_ru (%(default)s)",
+    )
+    parser.add_argument(
+        "--campus",
+        default=DEFARGS['CAMPUS'],
+        action="store_true",
+        help="Apply the campus ZH<->RU glossary and noise protection automatically",
+    )
     return parser
 
 def get_args():

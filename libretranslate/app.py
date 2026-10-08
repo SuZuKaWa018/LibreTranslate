@@ -1,4 +1,5 @@
 import io
+import json as jsonlib
 import math
 import os
 import re
@@ -23,6 +24,11 @@ from werkzeug.http import http_date
 from werkzeug.utils import secure_filename
 
 from libretranslate import flood, remove_translated_files, scheduler, secret, security, storage, cache
+from libretranslate.campus import (
+    CampusOptions,
+    Glossary,
+    build_campus_translator,
+)
 from libretranslate.language import model2iso, iso2model, detect_languages, improve_translation_formatting, get_language_with_fallback
 from libretranslate.locales import (
     _,
@@ -204,6 +210,22 @@ def create_app(args):
     language_pairs = {}
     for lang in languages:
         language_pairs[lang.code] = sorted([l.to_lang.code for l in lang.translations_from])
+
+    # --- 校园中俄增强（Campus ZH-RU）---------------------------------------
+    # 术语库、编号保护、姓名音译实现在 libretranslate.campus 里；这里只做装配。
+    # 传给 CampusTranslator 的翻译回调只是一个占位直通函数：
+    # /translate 视图会用 prepare()/finish() 两阶段把遮蔽与回填夹在真正的
+    # Argos 调用两侧，从而复用上游原有的批量、HTML、候选译文等逻辑。
+    glossary_dir = getattr(args, "glossary_dir", "") or ""
+    glossary_profile = getattr(args, "glossary", "") or ""
+    campus_default_on = bool(getattr(args, "campus", False))
+    campus_noise_file = os.path.join(glossary_dir, "campus_noise.json") if glossary_dir else ""
+    campus_service = build_campus_translator(
+        lambda texts, src, tgt: list(texts),
+        glossary_dir=glossary_dir or None,
+        profile=glossary_profile or None,
+        noise_file=campus_noise_file or None,
+    )
 
     # Map userdefined frontend languages to argos language object.
     if args.frontend_language_source == "auto":
@@ -743,6 +765,50 @@ def create_app(args):
         if not target_lang:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='target'))
 
+        # ---- 校园增强参数（可选，缺省时行为与上游完全一致）-----------------
+        def _read_flag(name, default=None):
+            raw = json.get(name) if request.is_json else request.values.get(name)
+            if raw is None:
+                return default
+            if isinstance(raw, bool):
+                return raw
+            return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+        campus_flag = bool(_read_flag("campus", False))
+        protect_flag = _read_flag("protect", None)
+        strict_flag = _read_flag("glossary_strict", None)
+        names_flag = bool(_read_flag("name_suggestions", False))
+        glossary_param = json.get("glossary") if request.is_json else request.values.get("glossary")
+        request_glossary = None
+        if glossary_param is not None and str(glossary_param).strip().startswith("["):
+            try:
+                request_glossary = Glossary.from_dicts(jsonlib.loads(glossary_param))
+            except Exception:
+                abort(400, description=_("Invalid request: %(name)s parameter is not a supported glossary document", name='glossary'))
+        campus_options = None
+        if campus_flag or protect_flag is not None or glossary_param is not None:
+            campus_options = CampusOptions.from_flags(
+                source_lang or "auto",
+                target_lang or "",
+                campus=campus_flag,
+                glossary=None if glossary_param is None else bool(glossary_param),
+                protect=protect_flag,
+                strict=strict_flag,
+                names=names_flag,
+            )
+        elif campus_default_on and "ru" in (str(source_lang), str(target_lang)):
+            # --campus：中俄方向默认开启术语库与编号保护
+            campus_options = CampusOptions.from_flags(source_lang or "auto", target_lang, campus=True)
+
+        active_campus = campus_service
+        if request_glossary is not None:
+            # 请求级术语表：只在本次请求生效，不落库
+            active_campus = build_campus_translator(lambda texts, src, tgt: list(texts))
+            active_campus.glossary = request_glossary
+            active_campus.abbreviations = campus_service.abbreviations
+            active_campus.names = campus_service.names
+        campus_reports = []
+
         try:
             num_alternatives = max(0, int(num_alternatives))
         except ValueError:
@@ -773,7 +839,7 @@ def create_app(args):
 
         ak = get_req_api_key()
         cache_key = None
-        if trans_cache.should_check(ak):
+        if trans_cache.should_check(ak) and campus_options is None:
           cache_key, hit = trans_cache.hit(src_texts, source_lang, target_lang, text_format, num_alternatives)
           if hit is not None:
             return Response(hit, status=200, mimetype="application/json")
@@ -826,16 +892,25 @@ def create_app(args):
                         abort(400, description=_("%(tname)s (%(tcode)s) is not available as a target language from %(sname)s (%(scode)s)", tname=_lazy(tgt_lang.name), tcode=tgt_lang.code, sname=_lazy(src_lang.name), scode=src_lang.code))
 
                     if translatable:
+                      campus_request = active_campus.prepare(text, campus_options) if campus_options else None
+                      engine_text = campus_request.text if campus_request is not None else text
                       if text_format == "html":
-                          translated_text = unescape(str(translate_html(translator, text)))
+                          translated_text = unescape(str(translate_html(translator, engine_text)))
                           alternatives = [] # Not supported for html yet
                       else:
-                          hypotheses = translator.hypotheses(text, num_alternatives + 1)
-                          translated_text = unescape(improve_translation_formatting(text, hypotheses[0].value))
-                          alternatives = filter_unique([unescape(improve_translation_formatting(text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                          hypotheses = translator.hypotheses(engine_text, num_alternatives + 1)
+                          translated_text = unescape(improve_translation_formatting(engine_text, hypotheses[0].value))
+                          alternatives = filter_unique([unescape(improve_translation_formatting(engine_text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                      if campus_request is not None:
+                          finished = active_campus.finish(campus_request, translated_text)
+                          translated_text = finished.text
+                          alternatives = [active_campus.finish(campus_request, alt).text for alt in alternatives]
+                          campus_reports.append(finished.to_dict())
                     else:
                       translated_text = text # Cannot translate, send the original text back
                       alternatives = []
+                      if campus_options is not None:
+                          campus_reports.append({"translatedText": text, "warnings": ["内容无需翻译，已原样返回"]})
 
                     batch_results.append(translated_text)
                     batch_alternatives.append(alternatives)
@@ -852,16 +927,25 @@ def create_app(args):
                     abort(400, description=_("%(tname)s (%(tcode)s) is not available as a target language from %(sname)s (%(scode)s)", tname=_lazy(tgt_lang.name), tcode=tgt_lang.code, sname=_lazy(src_lang.name), scode=src_lang.code))
 
                 if translatable:
+                  campus_request = active_campus.prepare(q, campus_options) if campus_options else None
+                  engine_text = campus_request.text if campus_request is not None else q
                   if text_format == "html":
-                      translated_text = unescape(str(translate_html(translator, q)))
+                      translated_text = unescape(str(translate_html(translator, engine_text)))
                       alternatives = [] # Not supported for html yet
                   else:
-                      hypotheses = translator.hypotheses(q, num_alternatives + 1)
-                      translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
-                      alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                      hypotheses = translator.hypotheses(engine_text, num_alternatives + 1)
+                      translated_text = unescape(improve_translation_formatting(engine_text, hypotheses[0].value))
+                      alternatives = filter_unique([unescape(improve_translation_formatting(engine_text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                  if campus_request is not None:
+                      finished = active_campus.finish(campus_request, translated_text)
+                      translated_text = finished.text
+                      alternatives = [active_campus.finish(campus_request, alt).text for alt in alternatives]
+                      campus_reports.append(finished.to_dict())
                 else:
                   translated_text = q # Cannot translate, send the original text back
                   alternatives = []
+                  if campus_options is not None:
+                      campus_reports.append({"translatedText": q, "warnings": ["内容无需翻译，已原样返回"]})
 
                 result = {"translatedText": translated_text}
 
@@ -870,7 +954,11 @@ def create_app(args):
                 if num_alternatives > 0:
                     result["alternatives"] = alternatives
             
-            if cache_key is not None:
+            if campus_options is not None:
+                # 校园增强结果带术语审计信息，缓存会掩盖参数差异，故跳过
+                result["campus"] = campus_reports if batch else (campus_reports[0] if campus_reports else None)
+
+            if cache_key is not None and campus_options is None:
               trans_cache.cache(cache_key, result)
 
             return jsonify(result)
@@ -1324,6 +1412,62 @@ def create_app(args):
     swag["info"]["title"] = "LibreTranslate"
     swag["info"]["description"] = "Free and Open Source Machine Translation API."
     swag["info"]["license"] = {"name": "AGPL-3.0"}
+
+    @bp.get("/campus/status")
+    def campus_status():
+        """校园中俄增强的运行状态：术语库规模、保护规则、人名表规模。
+
+        ---
+        tags:
+          - campus
+        responses:
+          200:
+            description: Campus toolkit status
+        """
+        return jsonify(campus_service.status())
+
+    @bp.get("/campus/glossary")
+    def campus_glossary():
+        """导出术语库：?source=zh&target=ru 时同时返回直出对照表。
+
+        ---
+        tags:
+          - campus
+        parameters:
+          - in: query
+            name: source
+            schema:
+              type: string
+              example: zh
+            required: false
+            description: Source language code
+          - in: query
+            name: target
+            schema:
+              type: string
+              example: ru
+            required: false
+            description: Target language code
+        responses:
+          200:
+            description: Glossary terms
+        """
+        source = request.values.get("source", "zh")
+        target = request.values.get("target", "ru")
+        terms = campus_service.glossary.terms
+        body = {
+            "profile": campus_service.glossary.name,
+            "version": campus_service.glossary.version,
+            "count": len(terms),
+            "stats": campus_service.glossary.stats(),
+            "terms": [
+                {"zh": t.zh, "ru": t.ru, "en": t.en, "domain": t.domain, "note": t.note}
+                for t in terms
+            ],
+        }
+        if source != target:
+            body["direct"] = campus_service.glossary.translate_terms(source, target)
+        return jsonify(body)
 
     @app.route(api_url)
     @limiter.exempt

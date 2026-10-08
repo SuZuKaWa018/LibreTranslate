@@ -14,6 +14,40 @@ Free and Open Source Machine Translation API, entirely self-hosted. Unlike other
 - [Usage Instructions](https://docs.libretranslate.com/guides/api_usage/)
 - [Community Resources](https://docs.libretranslate.com/community/resources/)
 
+## 校园中俄翻译增强（Campus ZH⇄RU fork）
+
+本仓库是 LibreTranslate 的一个分叉，额外提供面向中外合作办学场景（首发：深圳北理莫斯科大学）
+的中俄双语增强能力：**术语库优先翻译、校园噪音保护（课程编号/教室/邮箱/日期等）、
+俄语姓名音译、中俄一键对照排版**。完整说明见 [docs/campus-zh-ru.md](docs/campus-zh-ru.md)，
+改动清单见 [docs/CHANGES-campus.md](docs/CHANGES-campus.md)。
+
+不需要语言模型即可验证（71 项单元测试 + 离线对照排版演示）：
+
+```bash
+python scripts/campus/run_tests.py                                 # 单元测试
+python scripts/campus/validate_glossary.py                         # 术语库质检
+python scripts/campus/demo.py                                      # 生成 demo_output/notice_zh_ru.md
+python scripts/campus/translate_docs.py -i notice.md -o out/pair.md --layout paragraph
+```
+
+带模型的完整服务：
+
+```bash
+pip install -e .
+python main.py --update-models
+python main.py --glossary-dir data/glossary --glossary campus_zh_ru --campus
+```
+
+```bash
+curl -s http://localhost:5000/translate -H 'Content-Type: application/json' -d '{
+  "q": "本课程讲授数据结构与操作系统，教室 3-412。",
+  "source": "zh", "target": "ru", "campus": true
+}'
+```
+
+本分叉整体仍以 AGPL-3.0 发布；若作为网络服务提供给他人使用，请按 AGPL 第 13 条
+向使用者提供完整源代码（见文档第 7 节）。
+
 ## Credits
 
 This work is largely possible thanks to [Argos Translate](https://github.com/argosopentech/argos-translate), which powers the translation engine.
